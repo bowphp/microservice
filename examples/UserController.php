@@ -1,0 +1,46 @@
+<?php
+
+declare(strict_types=1);
+
+namespace Examples;
+
+use Bow\Microservice\Message\Packet;
+use Bow\Microservice\Server\EventPattern;
+use Bow\Microservice\Server\MessagePattern;
+
+/**
+ * A controller is just a plain class. Each handler receives the decoded
+ * payload as its first argument and the raw Packet as its second (handy for
+ * the correlation id, pattern, etc.). Return any JSON-serialisable value for
+ * RPC handlers; event handlers' return values are ignored.
+ */
+final class UserController
+{
+    /** RPC: client calls $proxy->send('user.find', ['id' => 42]) and gets this back. */
+    #[MessagePattern('user.find')]
+    public function find(mixed $data, Packet $packet): array
+    {
+        $id = (int) ($data['id'] ?? 0);
+
+        return [
+            'id'    => $id,
+            'name'  => "User #{$id}",
+            'email' => "user{$id}@example.test",
+        ];
+    }
+
+    /** RPC: simple computation. */
+    #[MessagePattern('math.sum')]
+    public function sum(mixed $data): int
+    {
+        return array_sum(array_map('intval', (array) ($data['numbers'] ?? [])));
+    }
+
+    /** Event: fire-and-forget, no reply produced. */
+    #[EventPattern('user.created')]
+    public function onUserCreated(mixed $data): void
+    {
+        // e.g. send a welcome email, write an audit log, etc.
+        error_log('user.created -> ' . json_encode($data));
+    }
+}
