@@ -17,11 +17,11 @@ The package is a **framework-agnostic core** with a thin BowPHP adapter:
 ```
 Contracts/         ServerTransport, ClientTransport, Serializer  (the seams)
 Message/           Packet, ResponsePacket, JsonSerializer        (wire format)
-Server/            MicroserviceServer, HandlerRegistry,
+Consumer/          MicroserviceServer, HandlerRegistry,
                    MessagePattern, EventPattern, MicroserviceFactory
 Client/            ClientProxy, ClientFactory
 Transport/         {Tcp,Redis,RabbitMq,Kafka}{Server,Client}Transport
-Bow/               MicroserviceServiceProvider  (the ONLY Bow-coupled file)
+Bow/               MicroserviceConfiguration  (the ONLY Bow-coupled file)
 ```
 
 Every transport implements the same two contracts, so adding a fifth (NATS,
@@ -107,20 +107,28 @@ $proxy->emit('user.created', ['id' => 99]);       // fire-and-forget
 
 ## BowPHP integration
 
-Register the provider so a connected `ClientProxy` is available in the
-container:
+Register the configuration provider in your Kernel so a connected `ClientProxy`
+is bound in the container:
 
 ```php
-// config/services.php (or wherever Bow loads providers)
-return [
-    \Bow\Microservice\Bow\MicroserviceServiceProvider::class,
-];
+// app/Kernel.php
+public function configurations(): array
+{
+    return [
+        \Bow\Microservice\Bow\MicroserviceConfiguration::class,
+    ];
+}
 ```
 
-Copy `examples/config.microservice.php` to `config/microservice.php` and set
-your transport. The provider binds both `ClientProxy::class` and the
-`microservice.client` alias. For the consumer's controller instantiation, point
-the resolver in `microservice.php` at Bow's container `make()`.
+Add `config/microservice.php` to your app (see this repo's
+[`config/microservice.php`](config/microservice.php) for the template). The
+provider binds both `ClientProxy::class` and the `microservice.client` alias.
+
+The consumer entrypoint (`php microservice.php`) auto-detects the Kernel class
+(`App\Kernel` by default, override with `--kernel=` or `MICROSERVICE_KERNEL`),
+boots it, and instantiates controllers through Bow's container — so your
+consumers can use constructor DI just like HTTP controllers. List them in
+`config('microservice.controllers')` or pass `--controllers=A,B` on the CLI.
 
 ## Notes & limits
 

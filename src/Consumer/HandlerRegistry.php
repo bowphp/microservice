@@ -2,8 +2,9 @@
 
 declare(strict_types=1);
 
-namespace Bow\Microservice\Server;
+namespace Bow\Microservice\Consumer;
 
+use Bow\Microservice\Consumer\MessagePattern;
 use Bow\Microservice\Exception\HandlerNotFoundException;
 use Bow\Microservice\Message\Packet;
 

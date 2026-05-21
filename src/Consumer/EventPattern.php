@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Bow\Microservice\Server;
+namespace Bow\Microservice\Consumer;
 
 /**
  * Marks a method as a fire-and-forget event handler for a given pattern.

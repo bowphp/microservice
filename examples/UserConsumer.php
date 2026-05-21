@@ -5,8 +5,8 @@ declare(strict_types=1);
 namespace Examples;
 
 use Bow\Microservice\Message\Packet;
-use Bow\Microservice\Server\EventPattern;
-use Bow\Microservice\Server\MessagePattern;
+use Bow\Microservice\Consumer\EventPattern;
+use Bow\Microservice\Consumer\MessagePattern;
 
 /**
  * A controller is just a plain class. Each handler receives the decoded
@@ -14,7 +14,7 @@ use Bow\Microservice\Server\MessagePattern;
  * the correlation id, pattern, etc.). Return any JSON-serialisable value for
  * RPC handlers; event handlers' return values are ignored.
  */
-final class UserController
+final class UserConsumer
 {
     /** RPC: client calls $proxy->send('user.find', ['id' => 42]) and gets this back. */
     #[MessagePattern('user.find')]

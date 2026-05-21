@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Bow\Microservice\Server;
+namespace Bow\Microservice\Consumer;
 
 use Bow\Microservice\Contracts\ServerTransport;
 use Bow\Microservice\Exception\HandlerNotFoundException;
