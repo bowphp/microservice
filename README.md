@@ -10,6 +10,8 @@ attributes, then run a consumer that listens on a transport. Callers use a
 `ClientProxy` with `send()` / `emit()`. The transport only moves bytes — your
 handlers never change when you switch protocols.
 
+> 📖 Full user guide: [docs/en.md](docs/en.md) — French version: [docs/fr.md](docs/fr.md)
+
 ## Architecture
 
 The package is a **framework-agnostic core** with a thin BowPHP adapter:
@@ -25,8 +27,8 @@ Transport/         {Tcp,Redis,RabbitMq,Kafka}{Server,Client}Transport
 Bow/               MicroserviceConfiguration  (the ONLY Bow-coupled file)
 ```
 
-Every transport implements the same two contracts, so adding a fifth (NATS,
-MQTT, gRPC) means writing one server + one client class — nothing else moves.
+Every transport implements the same two contracts, so adding a sixth (NATS,
+MQTT, etc.) means writing one server + one client class — nothing else moves.
 
 ### The envelope
 
@@ -63,8 +65,8 @@ Then install the extension/library for the transport(s) you use:
 ## Define handlers
 
 ```php
-use Bow\Microservice\Server\MessagePattern;
-use Bow\Microservice\Server\EventPattern;
+use Bow\Microservice\Consumer\MessagePattern;
+use Bow\Microservice\Consumer\EventPattern;
 use Bow\Microservice\Message\Packet;
 
 final class UserController
@@ -83,18 +85,25 @@ final class UserController
 }
 ```
 
-## Run the consumer (`microservice.php`)
+## Run the consumer
 
-This is the `NestFactory.createMicroservice(...).listen()` equivalent.
+Two equivalent entrypoints — the BowPHP-integrated console command (recommended)
+and a standalone script:
 
 ```bash
-php microservice.php --transport=redis    --patterns=user.find,user.created
-php microservice.php --transport=tcp       --host=0.0.0.0 --port=3000
-php microservice.php --transport=rabbitmq  --queue=bow_microservice
-php microservice.php --transport=kafka     --topics=user_events --group=users
+# BowPHP console command — registered automatically by MicroserviceConfiguration
+php bow microservice:listen --transport=redis    --patterns=user.find,user.created
+php bow microservice:listen --transport=tcp      --host=0.0.0.0 --port=3000
+php bow microservice:listen --transport=rabbitmq --queue=bow_microservice
+php bow microservice:listen --transport=kafka    --topics=user_events --group=users
+
+# Standalone script — no Bow integration required
+php examples/microservice.php --transport=redis --patterns=user.find
 ```
 
-Supervise with systemd/supervisord; run N copies for concurrency.
+Both honour `config/microservice.php`; CLI flags override config. They install
+SIGTERM/SIGINT handlers (when `ext-pcntl` is available) so supervisord /
+systemd / Kubernetes can drain a worker cleanly. Run N copies for concurrency.
 
 ## Call from another service
 
@@ -106,6 +115,11 @@ $proxy->connect();
 
 $user = $proxy->send('user.find', ['id' => 42]); // RPC, blocks for reply
 $proxy->emit('user.created', ['id' => 99]);       // fire-and-forget
+
+// gRPC client to a non-PHP server implementing proto/microservice.proto
+$grpc = ClientFactory::create('grpc', ['host' => '127.0.0.1', 'port' => 50051]);
+$grpc->connect();
+$grpc->send('user.find', ['id' => 42]);
 ```
 
 ## BowPHP integration
@@ -127,11 +141,12 @@ Add `config/microservice.php` to your app (see this repo's
 [`config/microservice.php`](config/microservice.php) for the template). The
 provider binds both `ClientProxy::class` and the `microservice.client` alias.
 
-The consumer entrypoint (`php microservice.php`) auto-detects the Kernel class
-(`App\Kernel` by default, override with `--kernel=` or `MICROSERVICE_KERNEL`),
-boots it, and instantiates controllers through Bow's container — so your
-consumers can use constructor DI just like HTTP controllers. List them in
-`config('microservice.controllers')` or pass `--controllers=A,B` on the CLI.
+Both consumer entrypoints (`php bow microservice:listen` and
+`php examples/microservice.php`) boot the kernel and instantiate controllers
+through Bow's container — so your consumers can use constructor DI just like
+HTTP controllers. List them in `config('microservice.controllers')` or pass
+`--controllers=A,B` on the CLI. The standalone script also accepts
+`--kernel=` (or `MICROSERVICE_KERNEL`) to point at a custom Kernel class.
 
 ## Notes & limits
 
