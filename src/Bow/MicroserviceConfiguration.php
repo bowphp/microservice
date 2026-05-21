@@ -9,6 +9,7 @@ use Bow\Configuration\Loader;
 use Bow\Console\Console;
 use Bow\Microservice\Client\ClientFactory;
 use Bow\Microservice\Client\ClientProxy;
+use Bow\Microservice\Console\MicroserviceCommand;
 
 /**
  * BowPHP service provider for the microservice client.
@@ -78,6 +79,21 @@ final class MicroserviceConfiguration extends Configuration
 
         $this->container->bind(ClientProxy::class, $factory);
         $this->container->bind('microservice.client', $factory);
+
+        Console::register(
+            'microservice:listen',
+            MicroserviceCommand::class,
+            'Run the microservice consumer on the configured transport',
+            "Boots a MicroserviceServer for the chosen transport and blocks on listen().\n\n"
+                . "  --transport=tcp|redis|rabbitmq|kafka  override config('microservice.transport')\n"
+                . "  --controllers=Foo,Bar                 comma-separated FQCN list (overrides config)\n"
+                . "  --host, --port, --password            transport connection options\n"
+                . "  --patterns=a,b      (redis)           channels to subscribe to\n"
+                . "  --queue=name        (rabbitmq)        queue to consume from\n"
+                . "  --user, --vhost     (rabbitmq)        broker credentials / vhost\n"
+                . "  --topics=a,b        (kafka)           topics to subscribe to\n"
+                . "  --brokers, --group  (kafka)           kafka cluster + consumer group",
+        );
     }
 
     /**
@@ -128,12 +144,12 @@ final class MicroserviceConfiguration extends Configuration
         }
 
         // No config file present — derive everything from environment.
-        $transport = getenv('MICROSERVICE_TRANSPORT') ?: 'redis';
+        $transport = app_env('MICROSERVICE_TRANSPORT') ?: 'redis';
 
         return [
             'transport' => $transport,
             'options'   => self::optionsFromEnv($transport),
-            'timeout'   => (float) (getenv('MICROSERVICE_TIMEOUT') ?: 5.0),
+            'timeout'   => (float) (app_env('MICROSERVICE_TIMEOUT') ?: 5.0),
         ];
     }
 
@@ -150,24 +166,28 @@ final class MicroserviceConfiguration extends Configuration
     {
         return match ($transport) {
             'tcp' => [
-                'host' => getenv('MICROSERVICE_HOST') ?: '127.0.0.1',
-                'port' => (int) (getenv('MICROSERVICE_PORT') ?: 3000),
+                'host' => app_env('MICROSERVICE_HOST') ?: '127.0.0.1',
+                'port' => (int) (app_env('MICROSERVICE_PORT') ?: 3000),
             ],
             'redis' => [
-                'host'     => getenv('MICROSERVICE_HOST') ?: '127.0.0.1',
-                'port'     => (int) (getenv('MICROSERVICE_PORT') ?: 6379),
-                'password' => getenv('MICROSERVICE_REDIS_PASSWORD') ?: null,
+                'host'     => app_env('MICROSERVICE_HOST') ?: '127.0.0.1',
+                'port'     => (int) (app_env('MICROSERVICE_PORT') ?: 6379),
+                'password' => app_env('MICROSERVICE_REDIS_PASSWORD') ?: null,
             ],
             'rabbitmq' => [
-                'host'     => getenv('MICROSERVICE_HOST') ?: '127.0.0.1',
-                'port'     => (int) (getenv('MICROSERVICE_PORT') ?: 5672),
-                'user'     => getenv('MICROSERVICE_RABBIT_USER') ?: 'guest',
-                'password' => getenv('MICROSERVICE_RABBIT_PASSWORD') ?: 'guest',
-                'queue'    => getenv('MICROSERVICE_QUEUE') ?: 'bow_microservice',
+                'host'     => app_env('MICROSERVICE_HOST') ?: '127.0.0.1',
+                'port'     => (int) (app_env('MICROSERVICE_PORT') ?: 5672),
+                'user'     => app_env('MICROSERVICE_RABBIT_USER') ?: 'guest',
+                'password' => app_env('MICROSERVICE_RABBIT_PASSWORD') ?: 'guest',
+                'queue'    => app_env('MICROSERVICE_QUEUE') ?: 'bow_microservice',
+            ],
+            'grpc' => [
+                'host' => app_env('MICROSERVICE_HOST') ?: '127.0.0.1',
+                'port' => (int) (app_env('MICROSERVICE_PORT') ?: 50051),
             ],
             'kafka' => [
-                'brokers' => getenv('MICROSERVICE_BROKERS') ?: '127.0.0.1:9092',
-                'topic'   => getenv('MICROSERVICE_TOPIC') ?: 'bow_microservice',
+                'brokers' => app_env('MICROSERVICE_BROKERS') ?: '127.0.0.1:9092',
+                'topic'   => app_env('MICROSERVICE_TOPIC') ?: 'bow_microservice',
             ],
             default => [],
         };

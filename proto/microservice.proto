@@ -1,0 +1,36 @@
+// Wire format for the gRPC transport.
+//
+// bowphp/microservice ships a gRPC CLIENT only — PHP has no production-grade
+// native gRPC server. Implement the server side in any language (Go, Node,
+// Rust, Java…) by exposing the service below, then point a PHP service at it
+// with GrpcClientTransport.
+//
+// The envelope is intentionally generic: a single bytes field holds the
+// JSON-serialised Packet / ResponsePacket used by every other transport in
+// this library. That keeps the unified handler model (#[MessagePattern] and
+// #[EventPattern] dispatch by string) intact across all transports.
+
+syntax = "proto3";
+
+package microservice;
+
+// Carries a JSON-encoded Packet (request) or ResponsePacket (reply).
+//
+// The `payload` field is the exact same byte sequence produced by
+// Bow\Microservice\Message\JsonSerializer::encode().
+message MessageEnvelope {
+  bytes payload = 1;
+}
+
+message Empty {}
+
+// One service, two methods — mirrors ClientTransport::send / ClientTransport::emit.
+service MessageService {
+  // RPC. The reply MUST contain a ResponsePacket whose `id` matches the
+  // request packet's `id`.
+  rpc Send(MessageEnvelope) returns (MessageEnvelope);
+
+  // Fire-and-forget event. The server SHOULD return an empty response
+  // immediately; the client ignores the body.
+  rpc Emit(MessageEnvelope) returns (Empty);
+}

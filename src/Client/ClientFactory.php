@@ -6,6 +6,7 @@ namespace Bow\Microservice\Client;
 
 use Bow\Microservice\Contracts\ClientTransport;
 use Bow\Microservice\Exception\TransportException;
+use Bow\Microservice\Transport\GrpcClientTransport;
 use Bow\Microservice\Transport\KafkaClientTransport;
 use Bow\Microservice\Transport\RabbitMqClientTransport;
 use Bow\Microservice\Transport\RedisClientTransport;
@@ -17,6 +18,7 @@ final class ClientFactory
     public const REDIS = 'redis';
     public const RABBITMQ = 'rabbitmq';
     public const KAFKA = 'kafka';
+    public const GRPC = 'grpc';
 
     /** @param array<string,mixed> $options */
     public static function create(string $transport, array $options = [], float $defaultTimeout = 5.0): ClientProxy
@@ -49,6 +51,11 @@ final class ClientFactory
                 requestTopic: (string) ($o['topic'] ?? 'bow_microservice'),
                 brokers: (string) ($o['brokers'] ?? '127.0.0.1:9092'),
                 replyTopic: $o['reply_topic'] ?? null,
+            ),
+            self::GRPC => new GrpcClientTransport(
+                host: (string) ($o['host'] ?? '127.0.0.1'),
+                port: (int) ($o['port'] ?? 50051),
+                channelOptions: (array) ($o['channel_options'] ?? []),
             ),
             default => throw new TransportException("Unknown transport '{$transport}'."),
         };

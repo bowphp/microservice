@@ -1,6 +1,6 @@
 {
     "name": "bowphp/microservice",
-    "description": "NestJS-style multi-transport microservice layer for BowPHP (TCP, Redis, RabbitMQ, Kafka).",
+    "description": "NestJS-style multi-transport microservice layer for BowPHP (TCP, Redis, RabbitMQ, Kafka, gRPC).",
     "type": "library",
     "license": "MIT",
     "require": {
@@ -10,18 +10,26 @@
     },
     "require-dev": {
         "phpunit/phpunit": "^10.0",
-        "bowphp/framework": "^5.2"
+        "bowphp/framework": "^5.2",
+        "grpc/grpc": "^1.80",
+        "google/protobuf": "^5.35"
     },
     "suggest": {
         "ext-sockets": "Required for the TCP transport",
         "ext-redis": "Required for the Redis transport (phpredis)",
         "php-amqplib/php-amqplib": "Required for the RabbitMQ (AMQP) transport",
-        "ext-rdkafka": "Required for the Kafka transport"
+        "ext-rdkafka": "Required for the Kafka transport",
+        "ext-grpc": "Required for the gRPC client transport",
+        "grpc/grpc": "Required for the gRPC client transport (Composer wrapper around ext-grpc)",
+        "google/protobuf": "Optional: full protobuf runtime if you generate stubs from proto/microservice.proto"
     },
     "autoload": {
         "psr-4": {
             "Bow\\Microservice\\": "src/"
-        }
+        },
+        "files": [
+            "stubs/grpc_ext.php"
+        ]
     },
     "autoload-dev": {
         "psr-4": {

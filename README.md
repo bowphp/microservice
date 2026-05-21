@@ -1,8 +1,8 @@
 # bowphp/microservice
 
 A NestJS-style, multi-transport microservice layer for **BowPHP**. One handler
-API, four transports: **TCP**, **Redis** (pub/sub), **RabbitMQ** (AMQP), and
-**Kafka**.
+API, five transports: **TCP**, **Redis** (pub/sub), **RabbitMQ** (AMQP),
+**Kafka**, and **gRPC** (client only).
 
 The design mirrors NestJS: you write *controllers* whose methods carry
 `#[MessagePattern]` (request/response) or `#[EventPattern]` (fire-and-forget)
@@ -21,6 +21,7 @@ Consumer/          MicroserviceServer, HandlerRegistry,
                    MessagePattern, EventPattern, MicroserviceFactory
 Client/            ClientProxy, ClientFactory
 Transport/         {Tcp,Redis,RabbitMq,Kafka}{Server,Client}Transport
+                   GrpcClientTransport + Grpc/ (envelope, stub, codec)
 Bow/               MicroserviceConfiguration  (the ONLY Bow-coupled file)
 ```
 
@@ -43,6 +44,7 @@ How each transport correlates replies:
 | Redis     | `pattern` channel → `pattern.reply` channel + id     |
 | RabbitMQ  | `reply_to` queue + `correlation_id`                  |
 | Kafka     | reply topic + `kafka_correlationId` header           |
+| gRPC      | unary `MessageService.Send` returns MessageEnvelope  |
 
 ## Install
 
@@ -56,6 +58,7 @@ Then install the extension/library for the transport(s) you use:
 - Redis → `ext-redis` (phpredis)
 - RabbitMQ → `composer require php-amqplib/php-amqplib`
 - Kafka → `ext-rdkafka`
+- gRPC (client) → `pecl install grpc && composer require grpc/grpc google/protobuf`
 
 ## Define handlers
 
@@ -140,4 +143,8 @@ consumers can use constructor DI just like HTTP controllers. List them in
 - The default serializer is JSON. Implement `Serializer` for msgpack/protobuf.
 - Handler exceptions become an error `ResponsePacket`; the client re-throws them
   as `RpcException`. Events swallow-and-log errors (no caller to notify).
-```
+- **gRPC is client-only.** The `grpc` PHP extension provides no server API and
+  a production-grade PHP gRPC server requires RoadRunner or Swoole, neither of
+  which fits the single-process consumer model here. Implement the server side
+  in any language with a real gRPC server following [proto/microservice.proto](proto/microservice.proto) —
+  PHP services call it through `GrpcClientTransport`.

@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "7f9cf3546be41957ddd0289d8eda2bbe",
+    "content-hash": "2af712bce43a89331f752162656b917c",
     "packages": [
         {
             "name": "paragonie/constant_time_encoding",
@@ -370,16 +370,16 @@
     "packages-dev": [
         {
             "name": "bowphp/framework",
-            "version": "5.2.991",
+            "version": "5.3.0",
             "source": {
                 "type": "git",
                 "url": "https://github.com/bowphp/framework.git",
-                "reference": "130960a87082b624e3b89ca5521ccf36741ec633"
+                "reference": "b7255204a605b3109c42ad9b11d8ba2ec92eb685"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/bowphp/framework/zipball/130960a87082b624e3b89ca5521ccf36741ec633",
-                "reference": "130960a87082b624e3b89ca5521ccf36741ec633",
+                "url": "https://api.github.com/repos/bowphp/framework/zipball/b7255204a605b3109c42ad9b11d8ba2ec92eb685",
+                "reference": "b7255204a605b3109c42ad9b11d8ba2ec92eb685",
                 "shasum": ""
             },
             "require": {
@@ -460,20 +460,20 @@
                     "type": "open_collective"
                 }
             ],
-            "time": "2026-05-19T13:54:57+00:00"
+            "time": "2026-05-21T00:48:50+00:00"
         },
         {
             "name": "bowphp/tintin",
-            "version": "3.1.5",
+            "version": "3.1.6",
             "source": {
                 "type": "git",
                 "url": "https://github.com/bowphp/tintin.git",
-                "reference": "19bfb7bf4dcc68d912ef74fd9dc665af2ba80b32"
+                "reference": "1ef3015f5e7becb4e2cbc89ffb44837ff2071f1c"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/bowphp/tintin/zipball/19bfb7bf4dcc68d912ef74fd9dc665af2ba80b32",
-                "reference": "19bfb7bf4dcc68d912ef74fd9dc665af2ba80b32",
+                "url": "https://api.github.com/repos/bowphp/tintin/zipball/1ef3015f5e7becb4e2cbc89ffb44837ff2071f1c",
+                "reference": "1ef3015f5e7becb4e2cbc89ffb44837ff2071f1c",
                 "shasum": ""
             },
             "require": {
@@ -525,7 +525,7 @@
             ],
             "support": {
                 "issues": "https://github.com/bowphp/tintin/issues",
-                "source": "https://github.com/bowphp/tintin/tree/3.1.5"
+                "source": "https://github.com/bowphp/tintin/tree/3.1.6"
             },
             "funding": [
                 {
@@ -541,7 +541,7 @@
                     "type": "open_collective"
                 }
             ],
-            "time": "2025-12-21T00:45:19+00:00"
+            "time": "2026-05-21T11:18:47+00:00"
         },
         {
             "name": "brick/math",
@@ -805,6 +805,94 @@
                 }
             ],
             "time": "2025-08-08T12:00:00+00:00"
+        },
+        {
+            "name": "google/protobuf",
+            "version": "v5.35.0",
+            "source": {
+                "type": "git",
+                "url": "https://github.com/protocolbuffers/protobuf-php.git",
+                "reference": "d96ed77c7edaff3cd576a74173aa0b0655c87b1a"
+            },
+            "dist": {
+                "type": "zip",
+                "url": "https://api.github.com/repos/protocolbuffers/protobuf-php/zipball/d96ed77c7edaff3cd576a74173aa0b0655c87b1a",
+                "reference": "d96ed77c7edaff3cd576a74173aa0b0655c87b1a",
+                "shasum": ""
+            },
+            "require": {
+                "php": ">=8.2.0"
+            },
+            "require-dev": {
+                "phpunit/phpunit": ">=11.5.0 <12.0.0"
+            },
+            "suggest": {
+                "ext-bcmath": "Need to support JSON deserialization"
+            },
+            "type": "library",
+            "autoload": {
+                "psr-4": {
+                    "Google\\Protobuf\\": "src/Google/Protobuf",
+                    "GPBMetadata\\Google\\Protobuf\\": "src/GPBMetadata/Google/Protobuf"
+                }
+            },
+            "notification-url": "https://packagist.org/downloads/",
+            "license": [
+                "BSD-3-Clause"
+            ],
+            "description": "proto library for PHP",
+            "homepage": "https://developers.google.com/protocol-buffers/",
+            "keywords": [
+                "proto"
+            ],
+            "support": {
+                "source": "https://github.com/protocolbuffers/protobuf-php/tree/v5.35.0"
+            },
+            "time": "2026-05-19T22:13:40+00:00"
+        },
+        {
+            "name": "grpc/grpc",
+            "version": "1.80.0",
+            "source": {
+                "type": "git",
+                "url": "https://github.com/grpc/grpc-php.git",
+                "reference": "a0dc463d5d5064cdd7ff344f13f61d7e233f9b5a"
+            },
+            "dist": {
+                "type": "zip",
+                "url": "https://api.github.com/repos/grpc/grpc-php/zipball/a0dc463d5d5064cdd7ff344f13f61d7e233f9b5a",
+                "reference": "a0dc463d5d5064cdd7ff344f13f61d7e233f9b5a",
+                "shasum": ""
+            },
+            "require": {
+                "php": ">=7.1.0"
+            },
+            "require-dev": {
+                "google/auth": "^v1.3.0"
+            },
+            "suggest": {
+                "ext-protobuf": "For better performance, install the protobuf C extension.",
+                "google/protobuf": "To get started using grpc quickly, install the native protobuf library."
+            },
+            "type": "library",
+            "autoload": {
+                "psr-4": {
+                    "Grpc\\": "src/lib/"
+                }
+            },
+            "notification-url": "https://packagist.org/downloads/",
+            "license": [
+                "Apache-2.0"
+            ],
+            "description": "gRPC library for PHP",
+            "homepage": "https://grpc.io",
+            "keywords": [
+                "rpc"
+            ],
+            "support": {
+                "source": "https://github.com/grpc/grpc-php/tree/v1.80.0"
+            },
+            "time": "2026-03-30T09:22:39+00:00"
         },
         {
             "name": "myclabs/deep-copy",
