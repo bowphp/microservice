@@ -34,7 +34,7 @@ return [
     'timeout' => (float) app_env('MICROSERVICE_TIMEOUT', 5.0),
 
     /*
-    | Consumer controllers registered by `php microservice.php`. Each entry is
+    | Consumer controllers registered by `microservice.php`. Each entry is
     | a fully qualified class name annotated with #[MessagePattern] and/or
     | #[EventPattern] methods. Override per-process with `--controllers=...`.
     */
@@ -59,6 +59,17 @@ return [
         'host'     => app_env('MICROSERVICE_HOST', '127.0.0.1'),
         'port'     => (int) app_env('MICROSERVICE_PORT', 6379),
         'password' => app_env('MICROSERVICE_REDIS_PASSWORD', null),
+
+        /*
+        | Pub/sub channels the CONSUMER subscribes to. Ignored by the client.
+        | Override per-process with `--patterns=foo,bar` or
+        | MICROSERVICE_PATTERNS=foo,bar. RedisServerTransport refuses to start
+        | with an empty list — Redis pub/sub has no auto-discovery.
+        */
+        'patterns' => array_values(array_filter(array_map(
+            'trim',
+            explode(',', (string) app_env('MICROSERVICE_PATTERNS', '')),
+        ))),
     ],
 
     /*
@@ -71,6 +82,17 @@ return [
         'user'     => app_env('MICROSERVICE_RABBIT_USER', 'guest'),
         'password' => app_env('MICROSERVICE_RABBIT_PASSWORD', 'guest'),
         'queue'    => app_env('MICROSERVICE_QUEUE', 'bow_microservice'),
+    ],
+
+    /*
+    | gRPC transport — client only. PHP has no native gRPC server, so
+    | implement the server in any language that does (Go/Node/Rust/Java)
+    | following proto/microservice.proto. Requires the `grpc` PHP extension
+    | (pecl install grpc) and the grpc/grpc Composer package.
+    */
+    'grpc' => [
+        'host' => app_env('MICROSERVICE_HOST', '127.0.0.1'),
+        'port' => (int) app_env('MICROSERVICE_PORT', 50051),
     ],
 
     /*
