@@ -2,8 +2,6 @@
 
 declare(strict_types=1);
 
-namespace Examples;
-
 use Bow\Microservice\Message\Packet;
 use Bow\Microservice\Consumer\EventPattern;
 use Bow\Microservice\Consumer\MessagePattern;

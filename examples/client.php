@@ -12,7 +12,7 @@ declare(strict_types=1);
 
 use Bow\Microservice\Client\ClientFactory;
 
-require __DIR__ . '/vendor/autoload.php';
+require __DIR__ . '/../vendor/autoload.php';
 
 $opts = getopt('', ['transport:', 'host:', 'port:']);
 $transport = $opts['transport'] ?? 'redis';
@@ -29,11 +29,11 @@ $proxy->connect();
 $user = $proxy->send('user.find', ['id' => 42]);
 echo "user.find  => " . json_encode($user) . PHP_EOL;
 
-$sum = $proxy->send('math.sum', ['numbers' => [1, 2, 3, 4]]);
-echo "math.sum   => {$sum}" . PHP_EOL;
-
 // Event — fire-and-forget.
 $proxy->emit('user.created', ['id' => 99, 'name' => 'Ada']);
 echo "user.created emitted" . PHP_EOL;
+
+$sum = $proxy->send('math.sum', ['numbers' => [1, 2, 3, 4]]);
+echo "math.sum   => {$sum}" . PHP_EOL;
 
 $proxy->close();

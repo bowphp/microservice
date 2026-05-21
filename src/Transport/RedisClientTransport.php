@@ -12,11 +12,27 @@ use Bow\Microservice\Message\Packet;
 use Bow\Microservice\Message\ResponsePacket;
 
 /**
- * Redis pub/sub producer (phpredis).
+ * Redis transport producer (phpredis).
  *
- * For RPC: publish on "<pattern>", then block-subscribe on "<pattern>.reply"
- * until a message whose id matches arrives, or the timeout elapses. For events:
- * publish and return.
+ * Wire protocol:
+ *
+ *   - RPC request   (send):  LPUSH list "<rpcKeyPrefix><pattern>"  → server BRPOPs it,
+ *                            runs handler, RPUSHes the reply on
+ *                            "<replyKeyPrefix><id>" with TTL.
+ *   - RPC reply     (send):  BLPOP "<replyKeyPrefix><id>" with timeout.
+ *   - Event         (emit):  PUBLISH on channel "<pattern>" → every subscribed
+ *                            consumer process receives a copy (fan-out).
+ *
+ * The list-based request path is a worker pool: multiple consumer processes
+ * can BRPOP the same key and Redis hands each message to exactly one of
+ * them — no wasted work, no duplicate handler invocations. Replies use a
+ * per-request list (keyed by packet id) so concurrent calls don't interfere
+ * and the publish-before-subscribe race that plain pub/sub had is gone:
+ * lists queue items regardless of who's reading.
+ *
+ * Events deliberately keep pub/sub semantics because broadcast (every
+ * consumer runs the handler — N audit writers, N email senders…) is the
+ * point of an event.
  */
 final class RedisClientTransport implements ClientTransport
 {
@@ -26,7 +42,8 @@ final class RedisClientTransport implements ClientTransport
         private readonly string $host = '127.0.0.1',
         private readonly int $port = 6379,
         private readonly Serializer $serializer = new JsonSerializer(),
-        private readonly string $replySuffix = '.reply',
+        private readonly string $replyKeyPrefix = 'bow:reply:',
+        private readonly string $rpcKeyPrefix = 'bow:rpc:',
         private readonly ?string $password = null,
     ) {
         if (!\extension_loaded('redis')) {
@@ -39,6 +56,7 @@ final class RedisClientTransport implements ClientTransport
         if ($this->pub instanceof \Redis) {
             return;
         }
+        // Default read timeout is fine here — we adjust it per-send around BLPOP.
         $this->pub = $this->makeConnection(readTimeout: 0.0);
     }
 
@@ -46,49 +64,46 @@ final class RedisClientTransport implements ClientTransport
     {
         $this->connect();
 
-        $replyChannel = $packet->pattern . $this->replySuffix;
+        $rpcKey = $this->rpcKeyPrefix . $packet->pattern;
+        $replyKey = $this->replyKeyPrefix . $packet->id;
 
-        // Dedicated subscriber connection with a bounded read timeout so the
-        // blocking subscribe loop can give up after $timeout seconds.
-        $sub = $this->makeConnection(readTimeout: $timeout);
+        // LPUSH enqueues the request. Multiple consumer processes BRPOP'ing
+        // the same key will be served one-at-a-time by Redis (worker pool).
+        // Unlike PUBLISH there's no immediate "no subscriber" signal — if
+        // nobody is draining the queue the request just sits there until
+        // we hit the BLPOP timeout below.
+        $this->pub->lPush($rpcKey, $this->serializer->encode($packet->toArray()));
 
-        $captured = null;
-        $deadline = microtime(true) + $timeout;
+        // BLPOP needs the connection's read timeout to be > the BLPOP timeout,
+        // otherwise the socket read times out before Redis can return. Set it
+        // here and restore afterwards so subsequent publish()/etc. don't
+        // inherit the long-or-zero timeout. `-1` here means "no client-side
+        // read timeout" — the canonical phpredis value to disable timeouts.
+        $this->pub->setOption(\Redis::OPT_READ_TIMEOUT, (string) ($timeout + 1.0));
 
-        // psubscribe/subscribe blocks; we unsubscribe from inside the callback
-        // once we see our correlation id (or let the read timeout fire).
         try {
-            $this->pub->publish($packet->pattern, $this->serializer->encode($packet->toArray()));
-
-            $sub->subscribe([$replyChannel], function (\Redis $redis, string $channel, string $message) use (&$captured, $packet, $deadline): void {
-                try {
-                    $resp = ResponsePacket::fromArray($this->serializer->decode($message));
-                } catch (\Throwable) {
-                    return;
-                }
-                if ($resp->id === $packet->id) {
-                    $captured = $resp;
-                    $redis->unsubscribe([$channel]); // breaks the loop
-                    return;
-                }
-                if (microtime(true) >= $deadline) {
-                    $redis->unsubscribe([$channel]);
-                }
-            });
+            // phpredis returns [key, value] on success, [] on timeout.
+            /** @var array<int,string>|false $result */
+            $result = $this->pub->blPop([$replyKey], (int) ceil($timeout));
         } catch (\RedisException) {
-            // Read timeout manifests as a RedisException — treated as a timeout below.
+            $result = [];
         } finally {
-            try {
-                $sub->close();
-            } catch (\Throwable) {
-            }
+            $this->pub->setOption(\Redis::OPT_READ_TIMEOUT, '-1');
         }
 
-        if ($captured === null) {
-            throw new TransportException("Redis RPC for '{$packet->pattern}' timed out after {$timeout}s.");
+        if (!is_array($result) || $result === []) {
+            throw new TransportException(sprintf(
+                "Redis RPC for '%s' timed out after %.1fs. "
+                . "Make sure a consumer is running with #[MessagePattern('%s')] "
+                . "(it should BRPOP the queue '%s').",
+                $packet->pattern,
+                $timeout,
+                $packet->pattern,
+                $rpcKey,
+            ));
         }
 
-        return $captured;
+        return ResponsePacket::fromArray($this->serializer->decode($result[1]));
     }
 
     public function emit(Packet $packet): void
@@ -101,7 +116,8 @@ final class RedisClientTransport implements ClientTransport
     {
         try {
             $this->pub?->close();
-        } catch (\Throwable) {
+        } catch (\Throwable $e) {
+            error_log($e->getMessage());
         }
         $this->pub = null;
     }

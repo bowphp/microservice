@@ -43,7 +43,7 @@ How each transport correlates replies:
 | Transport | RPC reply mechanism                                  |
 |-----------|------------------------------------------------------|
 | TCP       | same socket, 4-byte length-prefixed JSON frames      |
-| Redis     | `pattern` channel → `pattern.reply` channel + id     |
+| Redis     | PUBLISH on `pattern` → RPUSH on `bow:reply:<id>`     |
 | RabbitMQ  | `reply_to` queue + `correlation_id`                  |
 | Kafka     | reply topic + `kafka_correlationId` header           |
 | gRPC      | unary `MessageService.Send` returns MessageEnvelope  |

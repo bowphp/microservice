@@ -6,9 +6,12 @@ namespace Bow\Microservice\Console;
 
 use Bow\Console\AbstractCommand;
 use Bow\Console\Color;
+use Bow\Microservice\Consumer\EventPattern;
+use Bow\Microservice\Consumer\MessagePattern;
 use Bow\Microservice\Consumer\MicroserviceFactory;
 use Bow\Microservice\Consumer\MicroserviceServer;
 use Bow\Microservice\Exception\TransportException;
+use ReflectionClass;
 use Throwable;
 
 /**
@@ -44,7 +47,7 @@ final class MicroserviceCommand extends AbstractCommand
             exit(1);
         }
 
-        $options = $this->resolveOptions($transport);
+        $options = $this->resolveOptions($transport, $controllers);
 
         if ($error = $this->preflight($transport, $options)) {
             echo Color::red("error: {$error}\n");
@@ -130,9 +133,11 @@ final class MicroserviceCommand extends AbstractCommand
     }
 
     /**
+     * @param list<class-string> $controllers used to auto-discover Redis patterns
+     *                                        from controller attributes
      * @return array<string,mixed>
      */
-    private function resolveOptions(string $transport): array
+    private function resolveOptions(string $transport, array $controllers = []): array
     {
         $config = (array) $this->configValue("microservice.{$transport}", []);
 
@@ -145,7 +150,11 @@ final class MicroserviceCommand extends AbstractCommand
                 'host'     => (string) $this->arg->getParameter('--host', $config['host'] ?? '127.0.0.1'),
                 'port'     => (int) $this->arg->getParameter('--port', $config['port'] ?? 6379),
                 'password' => $this->arg->getParameter('--password', $config['password'] ?? null),
-                'patterns' => $this->parseList($this->arg->getParameter('--patterns'), (array) ($config['patterns'] ?? [])),
+                // CLI > config > auto-discovery from controllers' attributes.
+                'patterns' => $this->parseList(
+                    $this->arg->getParameter('--patterns'),
+                    (array) ($config['patterns'] ?? []) ?: $this->discoverPatterns($controllers),
+                ),
             ],
             MicroserviceFactory::RABBITMQ => [
                 'host'     => (string) $this->arg->getParameter('--host', $config['host'] ?? '127.0.0.1'),
@@ -191,5 +200,37 @@ final class MicroserviceCommand extends AbstractCommand
         } catch (Throwable) {
             return $default;
         }
+    }
+
+    /**
+     * Extract every pattern declared via #[MessagePattern] / #[EventPattern]
+     * on the given controller classes. Used as the last-resort fallback for
+     * Redis patterns so the user doesn't have to list them in two places.
+     *
+     * @param list<class-string> $controllers
+     * @return list<string>
+     */
+    private function discoverPatterns(array $controllers): array
+    {
+        $patterns = [];
+
+        foreach ($controllers as $class) {
+            if (!class_exists($class)) {
+                continue;
+            }
+
+            foreach ((new ReflectionClass($class))->getMethods() as $method) {
+                foreach ($method->getAttributes() as $attribute) {
+                    if ($attribute->getName() !== MessagePattern::class
+                        && $attribute->getName() !== EventPattern::class
+                    ) {
+                        continue;
+                    }
+                    $patterns[] = $attribute->newInstance()->pattern;
+                }
+            }
+        }
+
+        return array_values(array_unique($patterns));
     }
 }

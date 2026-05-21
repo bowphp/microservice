@@ -259,8 +259,13 @@ derrière un balancer TCP (HAProxy, nginx stream).
 
 ### Redis
 
-Utilise le pub/sub de `phpredis`. Chaque pattern est son propre canal ; les
-réponses RPC arrivent sur `{pattern}.reply` corrélées par l'`id` du packet.
+Utilise `phpredis`. Les requêtes passent par pub/sub (un canal par pattern
+enregistré) ; les réponses utilisent une liste Redis par requête, indexée
+par l'`id` du packet (`bow:reply:<id>`). Le serveur fait `RPUSH` de la
+réponse dans cette liste, le client la lit par `BLPOP`. Les listes mettent
+les messages en file, donc plus de race « publish avant subscribe » — même
+un serveur qui répond avant que le client soit prêt à lire ne perd pas de
+messages.
 
 ```bash
 php bow microservice:listen --transport=redis --patterns=user.find,user.created

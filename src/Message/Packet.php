@@ -39,7 +39,7 @@ final class Packet
 
     public static function event(string $pattern, mixed $data): self
     {
-        return new self($pattern, $data, '', self::KIND_EVENT);
+        return new self($pattern, $data, self::newId(), self::KIND_EVENT);
     }
 
     public function isEvent(): bool
@@ -69,6 +69,6 @@ final class Packet
 
     public static function newId(): string
     {
-        return bin2hex(random_bytes(16));
+        return uniqid(bin2hex(random_bytes(16)));
     }
 }

@@ -250,8 +250,12 @@ behind a TCP balancer (HAProxy, nginx stream).
 
 ### Redis
 
-Uses `phpredis` pub/sub. Each pattern is its own channel; RPC replies go to
-`{pattern}.reply` correlated by packet `id`.
+Uses `phpredis`. Requests use pub/sub (one channel per registered pattern);
+replies use a per-request Redis list keyed by the packet `id`
+(`bow:reply:<id>`). The server `RPUSH`es the reply onto that list, the client
+`BLPOP`s it. Lists queue items, so there's no publish-before-subscribe race —
+even a server that replies before the client is ready to read won't drop
+messages.
 
 ```bash
 php bow microservice:listen --transport=redis --patterns=user.find,user.created

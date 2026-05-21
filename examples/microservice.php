@@ -4,11 +4,14 @@ declare(strict_types=1);
 
 use Bow\Configuration\Loader;
 use Bow\Container\Capsule;
+use Bow\Microservice\Consumer\EventPattern;
+use Bow\Microservice\Consumer\MessagePattern;
 use Bow\Microservice\Consumer\MicroserviceFactory;
 use Psr\Log\AbstractLogger;
 use Psr\Log\LoggerInterface;
 
 require __DIR__ . '/../vendor/autoload.php';
+require __DIR__ . '/UserConsumer.php';
 
 $opts = getopt('', [
     'transport:', 'host:', 'port:', 'patterns:', 'queue:',
@@ -41,23 +44,35 @@ $transport = (string) (
     ?? ($cfg['transport'] ?? 'redis')
 );
 
-$transportOptions = buildTransportOptions($transport, $opts, $cfg);
-
-// Pre-flight: catch missing required options here with an actionable hint
-// instead of failing deep inside the transport with a generic error.
-preflight($transport, $transportOptions);
-
 // ---------------------------------------------------------------------------
-// 4. Controller list — config default, CLI override
+// 4. Controller list — resolved BEFORE transport options so Redis patterns
+//    can be auto-discovered from the controllers' attributes when the user
+//    hasn't supplied --patterns / env / config.
 // ---------------------------------------------------------------------------
 
 $controllers = isset($opts['controllers'])
     ? array_values(array_filter(array_map('trim', explode(',', $opts['controllers']))))
     : (array) ($cfg['controllers'] ?? []);
 
-if ($controllers === []) {
-    fwrite(STDERR, "warning: no controllers registered — set config('microservice.controllers') or pass --controllers=...\n");
+// Smoke-test default: if nothing was configured AND the bundled UserConsumer
+// fixture is loaded (it is — required at the top of this file), use it. That
+// keeps `php examples/microservice.php --transport=redis` working out of the
+// box without forcing the user to pass --controllers=UserConsumer every time.
+if ($controllers === [] && class_exists('UserConsumer')) {
+    $controllers = ['UserConsumer'];
+    fwrite(STDERR, "info: no --controllers supplied; defaulting to the bundled UserConsumer.\n");
 }
+
+if ($controllers === []) {
+    fwrite(STDERR, "error: no controllers registered — set config('microservice.controllers') or pass --controllers=...\n");
+    exit(1);
+}
+
+$transportOptions = buildTransportOptions($transport, $opts, $cfg, $controllers);
+
+// Pre-flight: catch missing required options here with an actionable hint
+// instead of failing deep inside the transport with a generic error.
+preflight($transport, $transportOptions);
 
 // ---------------------------------------------------------------------------
 // 5. Logger — prefer the one bound in the container, fall back to stderr
@@ -110,11 +125,14 @@ $server->listen();
  * Build the per-transport options array from CLI flags, env vars, and the
  * `microservice.<transport>` config block (in that override order).
  *
- * @param array<string,string|false> $opts CLI options from getopt()
- * @param array<string,mixed>        $cfg  Full microservice config block
+ * @param array<string,string|false> $opts        CLI options from getopt()
+ * @param array<string,mixed>        $cfg         Full microservice config block
+ * @param list<class-string>         $controllers Registered controllers, used to
+ *                                                auto-discover Redis patterns
+ *                                                from #[MessagePattern]/#[EventPattern].
  * @return array<string,mixed>
  */
-function buildTransportOptions(string $transport, array $opts, array $cfg): array
+function buildTransportOptions(string $transport, array $opts, array $cfg, array $controllers = []): array
 {
     // Per-transport defaults live under `$cfg[$transport]` in config/microservice.php.
     $base = (array) ($cfg[$transport] ?? []);
@@ -135,14 +153,16 @@ function buildTransportOptions(string $transport, array $opts, array $cfg): arra
             'host'     => (string) $pick('host', 'MICROSERVICE_HOST', 'host', '127.0.0.1'),
             'port'     => (int)    $pick('port', 'MICROSERVICE_PORT', 'port', 6379),
             'password' =>          $pick('password', 'MICROSERVICE_REDIS_PASSWORD', 'password', null),
-            // CLI > env > config[redis][patterns]. The transport refuses to
-            // start with an empty list; we surface that earlier in the
-            // pre-flight check below with a more actionable message.
+            // CLI > env > config[redis][patterns] > auto-discovery from
+            // controllers' #[MessagePattern]/#[EventPattern] attributes.
+            // Auto-discovery means a working setup needs only --controllers.
             'patterns' => isset($opts['patterns'])
                 ? splitCsv($opts['patterns'])
                 : (($csv = app_env('MICROSERVICE_PATTERNS')) !== null && $csv !== ''
                     ? splitCsv((string) $csv)
-                    : array_values((array) ($base['patterns'] ?? []))),
+                    : (count((array) ($base['patterns'] ?? [])) > 0
+                        ? array_values((array) $base['patterns'])
+                        : discoverPatterns($controllers))),
         ],
         'rabbitmq' => [
             'host'     => (string) $pick('host',     'MICROSERVICE_HOST',            'host',     '127.0.0.1'),
@@ -164,6 +184,41 @@ function buildTransportOptions(string $transport, array $opts, array $cfg): arra
 function splitCsv(string $csv): array
 {
     return array_values(array_filter(array_map('trim', explode(',', $csv)), 'strlen'));
+}
+
+/**
+ * Reflect on each controller class to extract every pattern string declared
+ * via #[MessagePattern] or #[EventPattern]. Used as the last-resort fallback
+ * when nothing's been passed on the CLI, env, or config — Redis pub/sub
+ * needs the patterns explicitly, but they're already encoded as attributes
+ * on the handlers, so requiring the user to list them twice is friction.
+ *
+ * @param list<class-string> $controllers
+ * @return list<string>
+ */
+function discoverPatterns(array $controllers): array
+{
+    $patterns = [];
+
+    foreach ($controllers as $class) {
+        if (!class_exists($class)) {
+            continue;
+        }
+
+        $reflection = new ReflectionClass($class);
+        foreach ($reflection->getMethods() as $method) {
+            foreach ($method->getAttributes() as $attribute) {
+                if ($attribute->getName() !== MessagePattern::class
+                    && $attribute->getName() !== EventPattern::class
+                ) {
+                    continue;
+                }
+                $patterns[] = $attribute->newInstance()->pattern;
+            }
+        }
+    }
+
+    return array_values(array_unique($patterns));
 }
 
 /**

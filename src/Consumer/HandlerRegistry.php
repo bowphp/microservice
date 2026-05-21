@@ -71,6 +71,32 @@ final class HandlerRegistry
     }
 
     /**
+     * Patterns served by #[MessagePattern] handlers (RPC, exactly-one delivery).
+     *
+     * @return list<string>
+     */
+    public function messagePatterns(): array
+    {
+        return array_keys(array_filter(
+            $this->handlers,
+            static fn (array $h): bool => empty($h['event']),
+        ));
+    }
+
+    /**
+     * Patterns served by #[EventPattern] handlers (broadcast / fan-out).
+     *
+     * @return list<string>
+     */
+    public function eventPatterns(): array
+    {
+        return array_keys(array_filter(
+            $this->handlers,
+            static fn (array $h): bool => !empty($h['event']),
+        ));
+    }
+
+    /**
      * Invoke the handler for a packet. Returns whatever the handler returns
      * (the value that will become the RPC response), or null for events.
      */

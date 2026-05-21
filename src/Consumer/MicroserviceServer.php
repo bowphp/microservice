@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Bow\Microservice\Consumer;
 
 use Bow\Microservice\Contracts\ServerTransport;
+use Bow\Microservice\Contracts\SubscribableServerTransport;
 use Bow\Microservice\Exception\HandlerNotFoundException;
 use Bow\Microservice\Message\Packet;
 use Bow\Microservice\Message\ResponsePacket;
@@ -44,6 +45,20 @@ final class MicroserviceServer
     public function listen(): void
     {
         $this->transport->connect();
+
+        // Auto-subscribe pattern-based transports (Redis, Kafka…) to every
+        // pattern the controllers registered, so callers never have to
+        // duplicate the list. We push the two kinds separately because they
+        // have opposite delivery semantics (RPC = exactly-once, event =
+        // broadcast). Transports that don't differentiate simply don't
+        // implement the marker.
+        if ($this->transport instanceof SubscribableServerTransport) {
+            $this->transport->subscribe(
+                $this->registry->messagePatterns(),
+                $this->registry->eventPatterns(),
+            );
+        }
+
         $this->logger->info(sprintf(
             '[microservice] listening via "%s" — patterns: %s',
             $this->transport->name(),

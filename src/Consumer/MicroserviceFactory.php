@@ -54,7 +54,11 @@ final class MicroserviceFactory
                 port: (int) ($o['port'] ?? 3000),
             ),
             self::REDIS => new RedisServerTransport(
-                patterns: (array) ($o['patterns'] ?? []),
+                // The two pattern lists are normally filled by
+                // MicroserviceServer::listen() via subscribe() once the
+                // controllers are registered, so callers rarely set them here.
+                messagePatterns: (array) ($o['message_patterns'] ?? $o['patterns'] ?? []),
+                eventPatterns: (array) ($o['event_patterns'] ?? []),
                 host: (string) ($o['host'] ?? '127.0.0.1'),
                 port: (int) ($o['port'] ?? 6379),
                 password: $o['password'] ?? null,

@@ -6,9 +6,31 @@ namespace Bow\Microservice\Tests;
 
 use Bow\Console\Argument;
 use Bow\Console\Setting;
+use Bow\Microservice\Consumer\EventPattern;
+use Bow\Microservice\Consumer\MessagePattern;
 use Bow\Microservice\Console\MicroserviceCommand;
 use PHPUnit\Framework\TestCase;
 use ReflectionMethod;
+
+final class FakeAutoDiscoveryController
+{
+    #[MessagePattern('user.find')]
+    public function find(): array
+    {
+        return [];
+    }
+
+    #[MessagePattern('order.create')]
+    public function create(): array
+    {
+        return [];
+    }
+
+    #[EventPattern('user.created')]
+    public function onCreated(): void
+    {
+    }
+}
 
 final class MicroserviceCommandTest extends TestCase
 {
@@ -56,6 +78,37 @@ final class MicroserviceCommandTest extends TestCase
         $this->assertSame('10.0.0.1', $opts['host']);
         $this->assertSame(6379, $opts['port']);
         $this->assertSame(['user.find', 'user.created'], $opts['patterns']);
+    }
+
+    public function testRedisPatternsAreAutoDiscoveredFromControllerAttributes(): void
+    {
+        $cmd = $this->buildCommand([]);
+
+        $opts = $this->invokePrivate(
+            $cmd,
+            'resolveOptions',
+            'redis',
+            [FakeAutoDiscoveryController::class],
+        );
+
+        $this->assertEqualsCanonicalizing(
+            ['user.find', 'order.create', 'user.created'],
+            $opts['patterns'],
+        );
+    }
+
+    public function testCliPatternsOverrideAutoDiscovery(): void
+    {
+        $cmd = $this->buildCommand(['--patterns=only.this']);
+
+        $opts = $this->invokePrivate(
+            $cmd,
+            'resolveOptions',
+            'redis',
+            [FakeAutoDiscoveryController::class],
+        );
+
+        $this->assertSame(['only.this'], $opts['patterns']);
     }
 
     public function testResolveRabbitMqOptionsFromCli(): void
