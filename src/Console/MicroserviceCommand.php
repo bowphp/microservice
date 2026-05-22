@@ -38,7 +38,7 @@ final class MicroserviceCommand extends AbstractCommand
             $this->configValue('microservice.transport', 'redis'),
         );
 
-        $controllers = $this->resolveControllers();
+        $controllers = $this->resolveControllers((array) config('microservice.controllers'));
 
         if ($controllers === []) {
             echo Color::red(
@@ -121,7 +121,7 @@ final class MicroserviceCommand extends AbstractCommand
     /**
      * @return list<class-string>
      */
-    private function resolveControllers(): array
+    private function resolveControllers(array $define_controllers = []): array
     {
         $fromCli = $this->arg->getParameter('--controllers');
 
@@ -129,7 +129,7 @@ final class MicroserviceCommand extends AbstractCommand
             return array_values(array_filter(array_map('trim', explode(',', $fromCli))));
         }
 
-        return array_values((array) $this->configValue('microservice.controllers', []));
+        return array_values((array) $define_controllers);
     }
 
     /**
