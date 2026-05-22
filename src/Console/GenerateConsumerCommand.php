@@ -12,11 +12,12 @@ class GenerateConsumerCommand extends AbstractCommand
   /**
    * Add consumer
    *
-   * @param  string $consumer
    * @return void
    */
-  public function run(string $consumer): void
+  public function process(): void
   {
+    $consumer = $this->arg->getTarget();
+
     $generator = new Generator(
       $this->setting->getBaseDirectory() . "/app/Consumers",
       $consumer
