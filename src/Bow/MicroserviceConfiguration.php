@@ -9,7 +9,9 @@ use Bow\Configuration\Loader;
 use Bow\Console\Console;
 use Bow\Microservice\Client\ClientFactory;
 use Bow\Microservice\Client\ClientProxy;
+use Bow\Microservice\Console\GenerateConsumerCommand;
 use Bow\Microservice\Console\MicroserviceCommand;
+use Bow\Microservice\Console\PublishConfigCommand;
 
 /**
  * BowPHP service provider for the microservice client.
@@ -80,20 +82,7 @@ final class MicroserviceConfiguration extends Configuration
         $this->container->bind(ClientProxy::class, $factory);
         $this->container->bind('microservice.client', $factory);
 
-        Console::register(
-            'microservice:listen',
-            MicroserviceCommand::class,
-            'Run the microservice consumer on the configured transport',
-            "Boots a MicroserviceServer for the chosen transport and blocks on listen().\n\n"
-                . "  --transport=tcp|redis|rabbitmq|kafka  override config('microservice.transport')\n"
-                . "  --controllers=Foo,Bar                 comma-separated FQCN list (overrides config)\n"
-                . "  --host, --port, --password            transport connection options\n"
-                . "  --patterns=a,b      (redis)           channels to subscribe to\n"
-                . "  --queue=name        (rabbitmq)        queue to consume from\n"
-                . "  --user, --vhost     (rabbitmq)        broker credentials / vhost\n"
-                . "  --topics=a,b        (kafka)           topics to subscribe to\n"
-                . "  --brokers, --group  (kafka)           kafka cluster + consumer group",
-        );
+        $this->registerCommands();
     }
 
     /**
@@ -191,5 +180,57 @@ final class MicroserviceConfiguration extends Configuration
             ],
             default => [],
         };
+    }
+
+    /**
+     * Register the package's console commands.
+     *
+     * Kept in a dedicated method (rather than inlined in {@see create()}) so
+     * the container-binding logic stays focused on bindings and the command
+     * surface stays easy to scan in one place.
+     */
+    private function registerCommands(): void
+    {
+        Console::register(
+            'microservice:publish-config',
+            PublishConfigCommand::class,
+            'Copy the default config/microservice.php into the host application',
+            "Copies the package's bundled config/microservice.php into the host\n"
+                . "application's config directory so it can be customized.\n\n"
+                . "Usage:\n"
+                . "  php bow microservice:publish-config [--force]\n\n"
+                . "Options:\n"
+                . "  --force   Overwrite an existing config/microservice.php (off by default\n"
+                . "            so customized configs cannot be silently lost).",
+        );
+
+        Console::register(
+            'add:consumer',
+            GenerateConsumerCommand::class,
+            'Generate a new microservice consumer class',
+            "Creates a new consumer class under app/Consumers/ from the bundled stub.\n\n"
+                . "Usage:\n"
+                . "  php bow add:consumer <ConsumerName>\n\n"
+                . "Arguments:\n"
+                . "  ConsumerName   Class name of the consumer to generate (e.g. OrderCreatedConsumer)\n\n"
+                . "The file is written to app/Consumers/<ConsumerName>.php using the\n"
+                . "namespace configured under namespaces.consumer (defaults to App\\Consumers).\n"
+                . "Fails if a file with the same name already exists.",
+        );
+
+        Console::register(
+            'microservice:listen',
+            MicroserviceCommand::class,
+            'Run the microservice consumer on the configured transport',
+            "Boots a MicroserviceServer for the chosen transport and blocks on listen().\n\n"
+                . "  --transport=tcp|redis|rabbitmq|kafka  override config('microservice.transport')\n"
+                . "  --controllers=Foo,Bar                 comma-separated FQCN list (overrides config)\n"
+                . "  --host, --port, --password            transport connection options\n"
+                . "  --patterns=a,b      (redis)           channels to subscribe to\n"
+                . "  --queue=name        (rabbitmq)        queue to consume from\n"
+                . "  --user, --vhost     (rabbitmq)        broker credentials / vhost\n"
+                . "  --topics=a,b        (kafka)           topics to subscribe to\n"
+                . "  --brokers, --group  (kafka)           kafka cluster + consumer group",
+        );
     }
 }
