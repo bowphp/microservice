@@ -35,7 +35,7 @@ final class MicroserviceCommand extends AbstractCommand
     {
         $transport = (string) $this->arg->getParameter(
             '--transport',
-            $this->configValue('microservice.transport', 'redis'),
+            $this->configValue('microservice.transport', config('microservice.transfort') ?? 'redis'),
         );
 
         $controllers = $this->resolveControllers((array) config('microservice.controllers'));
@@ -195,11 +195,9 @@ final class MicroserviceCommand extends AbstractCommand
      */
     private function configValue(string $key, mixed $default = null): mixed
     {
-        try {
-            return config($key, $default);
-        } catch (Throwable) {
-            return $default;
-        }
+        $value = config($key);
+
+        return !is_null($value) ? $value : $default;
     }
 
     /**
