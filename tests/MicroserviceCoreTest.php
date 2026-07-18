@@ -11,10 +11,10 @@ use Bow\Microservice\Exception\RpcException;
 use Bow\Microservice\Message\JsonSerializer;
 use Bow\Microservice\Message\Packet;
 use Bow\Microservice\Message\ResponsePacket;
-use Bow\Microservice\Server\HandlerRegistry;
-use Bow\Microservice\Server\MessagePattern;
-use Bow\Microservice\Server\EventPattern;
-use Bow\Microservice\Server\MicroserviceServer;
+use Bow\Microservice\Consumer\HandlerRegistry;
+use Bow\Microservice\Consumer\MessagePattern;
+use Bow\Microservice\Consumer\EventPattern;
+use Bow\Microservice\Consumer\MicroserviceServer;
 use PHPUnit\Framework\TestCase;
 
 final class FixtureController

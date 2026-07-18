@@ -22,14 +22,35 @@ use Bow\Microservice\Message\ResponsePacket;
  */
 final class TcpServerTransport implements ServerTransport
 {
+    /**
+     * Upper bound on an incoming frame's declared length. The 4-byte header can
+     * claim up to 4 GiB; without a cap a single crafted header makes the server
+     * attempt to buffer that much into memory (a memory-exhaustion DoS). 8 MiB
+     * is generous for JSON control messages — raise it via the constructor if
+     * your payloads are genuinely larger.
+     */
+    public const DEFAULT_MAX_FRAME_BYTES = 8 * 1024 * 1024;
+
     private mixed $server = null; // \Socket|null
     private bool $running = false;
 
+    /**
+     * @param string $host     Bind address. Defaults to loopback; pass '0.0.0.0'
+     *                         explicitly to expose the service on all interfaces,
+     *                         and only behind network isolation (this transport
+     *                         is unauthenticated).
+     * @param int    $maxFrameBytes Reject frames whose header exceeds this size.
+     * @param float  $readTimeout   Per-read idle timeout (seconds); a client that
+     *                         stalls mid-frame is dropped instead of blocking the
+     *                         single-threaded accept loop. 0 disables the timeout.
+     */
     public function __construct(
-        private readonly string $host = '0.0.0.0',
+        private readonly string $host = '127.0.0.1',
         private readonly int $port = 3000,
         private readonly Serializer $serializer = new JsonSerializer(),
         private readonly int $backlog = 128,
+        private readonly int $maxFrameBytes = self::DEFAULT_MAX_FRAME_BYTES,
+        private readonly float $readTimeout = 30.0,
     ) {
         if (!\extension_loaded('sockets')) {
             throw new TransportException('The "sockets" extension is required for TcpServerTransport.');
@@ -66,6 +87,15 @@ final class TcpServerTransport implements ServerTransport
             $client = @socket_accept($this->server);
             if ($client === false) {
                 continue;
+            }
+
+            // A stalled client must not hold the single-threaded accept loop:
+            // give each blocking read a deadline so an idle peer is dropped.
+            if ($this->readTimeout > 0) {
+                @socket_set_option($client, SOL_SOCKET, SO_RCVTIMEO, [
+                    'sec' => (int) $this->readTimeout,
+                    'usec' => (int) (($this->readTimeout - (int) $this->readTimeout) * 1_000_000),
+                ]);
             }
 
             try {
@@ -108,6 +138,15 @@ final class TcpServerTransport implements ServerTransport
         $length = $unpacked[1];
         if ($length === 0) {
             return '';
+        }
+
+        // Refuse an oversized declared length before allocating/reading it, so a
+        // crafted header can't drive the server into memory exhaustion. Throwing
+        // here drops just this connection; the accept loop keeps running.
+        if ($length > $this->maxFrameBytes) {
+            throw new TransportException(
+                "Incoming frame length {$length} exceeds the {$this->maxFrameBytes}-byte limit."
+            );
         }
 
         return $this->readExactly($client, $length);

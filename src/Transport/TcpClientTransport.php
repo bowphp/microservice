@@ -17,6 +17,12 @@ use Bow\Microservice\Message\ResponsePacket;
  */
 final class TcpClientTransport implements ClientTransport
 {
+    /**
+     * Upper bound on a reply frame's declared length, so a malicious or broken
+     * server cannot make the client buffer an arbitrary amount into memory.
+     */
+    public const DEFAULT_MAX_FRAME_BYTES = 8 * 1024 * 1024;
+
     /** @var resource|null */
     private $conn = null;
 
@@ -25,6 +31,7 @@ final class TcpClientTransport implements ClientTransport
         private readonly int $port = 3000,
         private readonly Serializer $serializer = new JsonSerializer(),
         private readonly float $connectTimeout = 5.0,
+        private readonly int $maxFrameBytes = self::DEFAULT_MAX_FRAME_BYTES,
     ) {
     }
 
@@ -88,6 +95,12 @@ final class TcpClientTransport implements ClientTransport
         /** @var array{1:int} $unpacked */
         $unpacked = unpack('N', $header);
         $length = $unpacked[1];
+
+        if ($length > $this->maxFrameBytes) {
+            throw new TransportException(
+                "Reply frame length {$length} exceeds the {$this->maxFrameBytes}-byte limit."
+            );
+        }
 
         return $length === 0 ? '' : $this->readExactly($length);
     }

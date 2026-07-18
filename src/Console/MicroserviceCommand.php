@@ -143,7 +143,10 @@ final class MicroserviceCommand extends AbstractCommand
 
         return match ($transport) {
             MicroserviceFactory::TCP => [
-                'host' => (string) $this->arg->getParameter('--host', $config['host'] ?? '0.0.0.0'),
+                // Loopback by default: the TCP transport is unauthenticated, so
+                // exposing it on all interfaces must be an explicit --host=0.0.0.0
+                // choice made behind network isolation.
+                'host' => (string) $this->arg->getParameter('--host', $config['host'] ?? '127.0.0.1'),
                 'port' => (int) $this->arg->getParameter('--port', $config['port'] ?? 3000),
             ],
             MicroserviceFactory::REDIS => [
@@ -195,7 +198,13 @@ final class MicroserviceCommand extends AbstractCommand
      */
     private function configValue(string $key, mixed $default = null): mixed
     {
-        $value = config($key);
+        try {
+            $value = config($key);
+        } catch (Throwable) {
+            // Config Loader not booted (unit tests / standalone CLI run) — the
+            // documented contract is to fall back to the caller's default.
+            return $default;
+        }
 
         return !is_null($value) ? $value : $default;
     }
